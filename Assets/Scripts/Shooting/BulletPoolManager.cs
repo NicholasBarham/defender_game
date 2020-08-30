@@ -3,46 +3,52 @@ using UnityEngine;
 
 namespace Defender
 {
-    public class BulletPoolManager : MonoBehaviour
+    public class BulletPoolManager : MonoBehaviour, IPoolManager
     {
-        [SerializeField] private GameObject[] bulletPool = null;
-        private List<IBullet> _bulletPool = new List<IBullet>();
+        [SerializeField] private GameObject bulletPrefab = null;
+        
+        private Queue<IBullet> _bulletPool = new Queue<IBullet>();
 
         private void Awake()
         {
-            GetAllBulletsFromPool();
+            GetAllBulletsFromChildren();
         }
 
-        private void GetAllBulletsFromPool()
+        private void GetAllBulletsFromChildren()
         {
             _bulletPool.Clear();
-            foreach (var bulletObject in bulletPool)
+
+            var bullets = transform.GetComponentsInChildren<IBullet>();
+
+            foreach (var bullet in bullets)
             {
-                if (bulletObject.TryGetComponent(out IBullet bullet))
-                {
-                    _bulletPool.Add(bullet);
-                }
+                _bulletPool.Enqueue(bullet);
             }
         }
 
-        public void FireBullet(ShootingInfo shootingInfo)
+        public void Fire(ShootingInfo shootingInfo)
         {
             IBullet bullet = FindAvailableBullet();
 
-            bullet.Use();
+            bullet.Use(this);
             bullet.Spawn(shootingInfo.Position);
             bullet.Fire(shootingInfo.Direction);
         }
 
+        public void Return(IBullet bullet)
+        {
+            if (!bullet.Equals(null))
+                _bulletPool.Enqueue(bullet);
+        }
+
         private IBullet FindAvailableBullet()
         {
-            for (int i = _bulletPool.Count - 1; i >= 0; i--)
-            {
-                if (_bulletPool[i].IsInUse == false)
-                    return _bulletPool[i];
-            }
+            return _bulletPool.Count > 0 ? _bulletPool.Dequeue() : CreateBullet();
+        }
 
-            return null;
+        private IBullet CreateBullet()
+        {
+            return Instantiate(bulletPrefab, transform).GetComponent<IBullet>();
         }
     }
 }
